@@ -8,14 +8,18 @@
     "node": ">=22"
   },
   "scripts": {
-    "pre-build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "tsc",
     "start": "node dist/src/index.js",
     "schedule": "node dist/src/scheduler.js",
     "manual-login": "node dist/src/scripts/manual-login.js",
     "clear-sessions": "node dist/src/scripts/clear-sessions.js",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node --test \"dist/test/*.test.js\""
+    "test": "npm run build && node --test \"dist/test/*.test.js\"",
+    "setup": "node scripts/setup.cjs",
+    "doctor": "node dist/src/scripts/doctor.js",
+    "prebuild": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "pre-build": "npm run clean"
   },
   "dependencies": {
     "playwright": "^1.48.0"

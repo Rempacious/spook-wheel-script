@@ -34,15 +34,31 @@ run exits with code 2. Run `manual-login` for it again.
 
 ## Setup
 
-Requires **Node.js 22 or newer** and **Google Chrome**.
+Install **[Node.js 22 or newer](https://nodejs.org/)** and **[Google Chrome](https://www.google.com/chrome/)** first. These commands work in Windows PowerShell, macOS, and Linux:
 
 ```bash
-git clone <your copy of this folder>   # or unzip it
+git clone https://github.com/Rempacious/spook-wheel-script.git
 cd spook-wheel-script
-npm install
-cp env.example .env                    # Windows: copy env.example .env
-cp config.example.json config.json     # Windows: copy config.example.json config.json
+npm run setup
 ```
+
+No Git? [Download the ZIP](https://github.com/Rempacious/spook-wheel-script/archive/refs/heads/main.zip), extract it, open a terminal in the extracted folder, and run `npm run setup`.
+
+Setup installs the locked dependencies, compiles the script, asks for your account email, and creates `.env` and `config.json`. It preserves existing settings and saved sessions when rerun. No Google password is requested. For a non-interactive setup, use `npm run setup -- --email you@gmail.com`; without an email, edit `.env` afterward.
+
+Then check your installation and sign in:
+
+```bash
+npm run doctor
+npm run manual-login -- --email you@gmail.com
+npm start
+```
+
+`doctor` checks configuration, accounts, browser availability, and saved profile folders without opening the promo or submitting entries. You still need to finish the manual sign-in below. A graphical desktop is required for that first sign-in.
+
+### Updating
+
+From a Git checkout, run `git pull --ff-only` and then `npm run setup`. For ZIP installations, replace the source files with the latest download while keeping `.env`, `config.json`, `sessions/`, and `logs/`, then rerun setup.
 
 ### Accounts (`.env`)
 
@@ -117,7 +133,9 @@ site rejects headless browsers.
 | Command | What it does |
 |---|---|
 | `npm run build` | Compile TypeScript to `dist/` |
-| `npm run pre-build` | Delete `dist/` (clean build) |
+| `npm run clean` | Delete `dist/` (also done automatically before each build) |
+| `npm run setup` | Install dependencies, build, and create missing settings |
+| `npm run doctor` | Check installation and list accounts needing sign-in |
 | `npm run start` | Run all accounts once |
 | `npm run schedule` | Built-in daily scheduler |
 | `npm run manual-login -- --email x@y.com` | One-time Google sign-in for an account |
@@ -178,6 +196,8 @@ Daily logs are written to `logs/run-YYYY-MM-DD.log`.
 - **`Session expired` / `LOGIN_REQUIRED`**: run `npm run manual-login -- --email you@gmail.com` again.
   If it happens on every run, the site is probably dropping its login when the browser closes. Tell me what the sign-in screen looks like and an automatic re-sign-in step can be added.
 - **`Got stuck` plus screenshot**: the promo page probably changed (button or popup text). Send me the screenshot.
+- **`Cannot find module dist/...`**: run `npm run setup` to install and compile.
+- **Setup failed during dependency installation**: check your internet connection, confirm `node --version` is 22 or newer, and rerun `npm run setup`.
 - **Chrome not found**: install Google Chrome or set `chromePath`.
 - **"profile in use" errors**: close every Chrome window using that profile before running.
 - **Run once with a visible window** to watch it: `npm run start -- --account 1 --headed`.
@@ -197,3 +217,14 @@ Different on purpose:
 
 Use only accounts you own, and check the promo's terms: many promos limit entries per person, and automation or
 multiple accounts can get entries disqualified. You are responsible for how you use this script.
+
+## Development and tests
+
+```bash
+npm ci
+npx playwright install chromium
+npm run typecheck
+npm test
+```
+
+On Linux, `npx playwright install --with-deps chromium` also installs required system libraries (may need administrator access). Browser tests use a local fake promo and webhook; they do not submit real entries. Without bundled Chromium, browser tests are skipped. Every build cleans stale compiled files first.

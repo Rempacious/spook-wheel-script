@@ -48,9 +48,13 @@ async function main(): Promise<void> {
     const args = [`--user-data-dir=${dir}`, '--no-first-run', '--no-default-browser-check'];
     if (account.proxy) args.push(`--proxy-server=${account.proxy.server}`);
     args.push(cfg.promoUrl);
-    await new Promise<void>((resolve) => {
+    await new Promise<void>((resolve, reject) => {
         const child = spawn(chrome, args, { stdio: 'ignore' });
-        child.on('exit', () => resolve());
+        child.on('error', reject);
+        child.on('exit', (code, signal) => {
+            if (code === 0) resolve();
+            else reject(new Error(`Chrome closed unexpectedly (${signal ?? code}). Try signing in again.`));
+        });
     });
     console.log('Chrome closed. Session saved.');
 

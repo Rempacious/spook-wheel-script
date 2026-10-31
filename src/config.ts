@@ -85,13 +85,26 @@ function isObj(v: unknown): v is Record<string, unknown> {
     return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-/** Deep-merge user settings over the defaults (arrays are replaced, not merged) */
-function merge<T>(base: T, over: unknown): T {
-    if (over === undefined) return base;
-    if (!isObj(base) || !isObj(over)) return over as T;
-    const out: Record<string, unknown> = { ...base };
-    for (const [k, v] of Object.entries(over)) out[k] = k in base ? merge(base[k], v) : v;
-    return out as T;
+/** Validate override types while merging, so errors identify the setting to fix. */
+function merge<T>(base: T, over: unknown, key = 'config.json'): T {
+    if (over === undefined) return structuredClone(base);
+    if (Array.isArray(base)) {
+        if (!Array.isArray(over) || over.some(value => typeof value !== 'string')) {
+            throw new Error(`${key} must be an array of strings`);
+        }
+        return over as T;
+    }
+    if (isObj(base)) {
+        if (!isObj(over)) throw new Error(`${key} must be an object`);
+        const out: Record<string, unknown> = {};
+        for (const name of Object.keys(over)) {
+            if (!Object.hasOwn(base, name)) throw new Error(`${key}.${name} is not a recognized setting`);
+        }
+        for (const [name, value] of Object.entries(base)) out[name] = merge(value, over[name], `${key}.${name}`);
+        return out as T;
+    }
+    if (typeof over !== typeof base) throw new Error(`${key} must be a ${typeof base}`);
+    return over as T;
 }
 
 export function validateConfig(cfg: Config): void {
@@ -111,9 +124,14 @@ export function validateConfig(cfg: Config): void {
         try { parseDuration(value); } catch (e) { throw new Error(`config.json: ${name}: ${(e as Error).message}`); }
     }
     if (!Number.isInteger(cfg.clusters) || cfg.clusters < 1) throw new Error('config.json: clusters must be a whole number >= 1');
-    if (!(cfg.wheel.maxSpinsPerAccount >= 1)) throw new Error('config.json: wheel.maxSpinsPerAccount must be >= 1');
+    if (!Number.isInteger(cfg.wheel.maxSpinsPerAccount) || cfg.wheel.maxSpinsPerAccount < 1) throw new Error('config.json: wheel.maxSpinsPerAccount must be a whole number >= 1');
     for (const t of cfg.schedule.times) {
         if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(t)) throw new Error(`config.json: schedule.times "${t}" must look like 00:05`);
+    }
+    if (parseDuration(cfg.accountDelay.min) > parseDuration(cfg.accountDelay.max)) throw new Error('config.json: accountDelay.min must not exceed accountDelay.max');
+    for (const name of ['globalTimeout', 'wheel.accountTimeout', 'wheel.stuckAfter', 'wheel.loginCheckTimeout', 'wheel.pollInterval']) {
+        const value = durations.find(([key]) => key === name)![1];
+        if (parseDuration(value) <= 0) throw new Error(`config.json: ${name} must be greater than zero`);
     }
     if (!['chrome', 'chromium'].includes(cfg.browser)) throw new Error('config.json: browser must be "chrome" or "chromium"');
 }
@@ -127,7 +145,7 @@ export function buildConfig(overrides: unknown = {}): Config {
 
 export function loadConfig(file: string = path.join(ROOT, 'config.json')): Config {
     if (!fs.existsSync(file)) {
-        throw new Error('config.json not found. Copy config.example.json to config.json and edit it.');
+        throw new Error('config.json not found. Run npm run setup to create it.');
     }
     let parsed: unknown;
     try {

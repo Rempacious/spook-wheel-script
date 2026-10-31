@@ -16,7 +16,7 @@ export const hasSession = (cfg: Config, email: string): boolean => fs.existsSync
 
 /** Installed Google Chrome (used for the one-time manual sign-in) */
 export function findChrome(cfg: Config): string | null {
-    if (cfg.chromePath && fs.existsSync(cfg.chromePath)) return cfg.chromePath;
+    if (cfg.chromePath) return fs.existsSync(cfg.chromePath) ? cfg.chromePath : null;
     const candidates: string[] = [];
     if (process.platform === 'win32') {
         for (const base of [process.env.PROGRAMFILES, process.env['PROGRAMFILES(X86)'], process.env.LOCALAPPDATA]) {
@@ -45,7 +45,11 @@ export async function launchSession(cfg: Config, account: Account, headlessOverr
     };
     if (account.proxy) opts.proxy = account.proxy;
     if (cfg.chromePath) opts.executablePath = cfg.chromePath;
-    else if (cfg.browser === 'chrome') opts.channel = 'chrome';
+    else if (cfg.browser === 'chrome') {
+        const chrome = findChrome(cfg);
+        if (!chrome) throw new Error('Google Chrome not found. Install it or set chromePath in config.json; run npm run doctor for help.');
+        opts.executablePath = chrome;
+    }
 
     const context = await chromium.launchPersistentContext(sessionDir(cfg, account.email), opts);
     const t = parseDuration(cfg.globalTimeout);
